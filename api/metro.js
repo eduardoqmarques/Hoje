@@ -12,7 +12,7 @@ async function getToken() {
     },
     body: "grant_type=client_credentials",
   });
-  if (!r.ok) throw new Error("Token request failed: " + r.status);
+  if (!r.ok) throw new Error("Token request failed: " + r.status + " | key length " + (process.env.ML_KEY || "").length + ", secret length " + (process.env.ML_SECRET || "").length + " | " + (await r.text()).slice(0, 200));
   const j = await r.json();
   cached = { token: j.access_token, expires: Date.now() + (j.expires_in - 60) * 1000 };
   return cached.token;
