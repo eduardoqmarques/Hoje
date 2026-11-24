@@ -87,7 +87,7 @@ loadF();
 const win=(n,off)=>{const a=iso(ago(off+n-1)),b=iso(ago(off));return D.filter(e=>e.d>=a&&e.d<=b)};
 
 /* ---------- weather / metro mocks ---------- */
-let MT=null,W=null;
+let MT=null,W=null,SP=DEMO?{p:6012.35,pct:.42,t:Date.now()}:null,SYNC="off";
 const wl=c=>c==0?"Clear":c<3?"Partly cloudy":c==3?"Overcast":c<50?"Fog":c<60?"Drizzle":c<70?"Rain":c<80?"Snow":c<90?"Showers":"Thunderstorm";
 const temp=h=>W?W.hrs[h].t:Math.round(15+4*Math.sin((h-9)/24*2*Math.PI));
 const rainP=h=>W?W.hrs[h].p:Math.min(90,8+(h==17||h==18?50:h==16||h==19?30:0));
@@ -100,6 +100,8 @@ function vToday(){
  const ms=MT&&MT.status&&MT.status.resposta,ok=!ms||ms.vermelha_curta=="normal",stxt=ok?"Normal service":String(ms.vermelha||"Service disruption").trim();
  const mins=m=>m==0?"Now":m+" min";
  const mi=Math.max(0,Math.round((Date.now()-S.upd)/60000));
+ const spc=SP&&SP.pct!=null?(SP.pct>=0?"up":"dn"):"mu",spt=SP&&SP.pct!=null?(SP.pct>=0?"+":"")+SP.pct.toFixed(2)+"%":"";
+ const spCard=`<div class="card"><div class="row"><h2>S&amp;P 500</h2><span class="mu">${SP&&SP.t?new Date(SP.t).toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})+" · delayed":"Delayed"}</span></div><div class="row" style="align-items:baseline"><b style="font-size:28px">${SP?SP.p.toLocaleString("en-US",{maximumFractionDigits:2}):"–"}</b><b class="${spc}">${spt}</b></div></div>`;
  const done=D.some(e=>e.d===TODAY),ld=L.some(x=>x.d===TODAY);
  return `<h1>${dl(TODAY,{weekday:"long",day:"numeric",month:"long"})}</h1><div class="mu">${DEMO?"Demo mode with sample data":"Lisbon · live data"}</div>
  <div class="card"><div class="row"><h2>Lisbon today</h2><span class="mu">${W?W.lab:"–"}</span></div>
@@ -109,8 +111,8 @@ function vToday(){
  <div class="card"><div class="row"><h2><span class="dot"></span>Olaias · Red line</h2><button class="link" data-a="dir">Switch direction</button></div>
  <div class="mu">Towards ${dk=="ss"?"São Sebastião":"Aeroporto"}</div>
  ${dep.length?`<div class="row" style="align-items:flex-end;margin-top:8px"><div class="big">${mins(dep[0])}</div><div class="mu" style="text-align:right">Then ${dep.slice(1).map(mins).join(" · ")}<br>${DEMO?"Estimated times":"Live"}</div></div>`:`<p class="mu">${MT&&MT.err?"Couldn’t load metro times.":DEMO||(MT&&MT.dir==dk)?"No departures found.":"Loading…"}</p>`}
- <div class="alert" style="color:var(${ok?"--ok":"--bad"})">${stxt}</div></div>
- <div class="row" style="margin-bottom:8px"><span class="mu">Updated ${mi?mi+" min ago":"just now"}</span><span><button class="link" data-a="export">Export data</button> · <button class="link" data-a="refresh">Refresh</button></span></div>
+ <div class="alert" style="color:var(${ok?"--ok":"--bad"})">${stxt}</div></div>${spCard}
+ <div class="row" style="margin-bottom:8px"><span class="mu">Updated ${mi?mi+" min ago":"just now"} · ${DEMO||SYNC=="off"?"Local only":SYNC=="ok"?"Synced":"Sync failed"}</span><span><button class="link" data-a="export">Export data</button> · <button class="link" data-a="refresh">Refresh</button></span></div>
  <div class="grid"><button class="card" style="text-align:left;margin:0" data-a="tab" data-v="ci"><b>Check-in</b><div class="mu">${done?"Done for today":"Not done yet"}</div></button>
  <button class="card" style="text-align:left;margin:0" data-a="tab" data-v="ls"><b>Lesson</b><div class="mu">${ld?"Added for today":"Not added yet"}</div></button></div>`}
 
@@ -207,17 +209,17 @@ function act(a,v){
  else if(a=="step"){const [k,d]=v.split(":");F[k]=Math.max(0,Math.min(12,F[k]+ +d))}
  else if(a=="wo")F.wo=+v;else if(a=="wfh")F.wfh=v;
  else if(a=="save"){if(["mood","energy","sleep","stress","focus"].some(k=>!F[k])){toast("Answer all five scores first");return}
-  const e={...F,d:S.edit,cond:F.cond||(W?W.lab:"–"),temp:F.temp??(W?W.t:17),rain:F.rain??(W?Math.max(...W.hrs.map(x=>x.p)):0)};const i=D.findIndex(x=>x.d===S.edit);if(i>=0)D[i]=e;else D.push(e);D.sort((x,y)=>x.d.localeCompare(y.d));
-  toast("Check-in saved");S.edit=TODAY;S.ci="trends";scrollTo(0,0)}
+  const e={...F,d:S.edit,u:Date.now(),cond:F.cond||(W?W.lab:"–"),temp:F.temp??(W?W.t:17),rain:F.rain??(W?Math.max(...W.hrs.map(x=>x.p)):0)};const i=D.findIndex(x=>x.d===S.edit);if(i>=0)D[i]=e;else D.push(e);D.sort((x,y)=>x.d.localeCompare(y.d));
+  push("checkin",e);toast("Check-in saved");S.edit=TODAY;S.ci="trends";scrollTo(0,0)}
  else if(a=="range")S.range=+v;else if(a=="vis")S.vis[v]=S.vis[v]?0:1;else if(a=="ins")S.ins=v;
  else if(a=="dir"){S.dir=(S.dir||(new Date().getHours()<14?"ss":"ae"))=="ss"?"ae":"ss";if(!DEMO)loadMetro()}
- else if(a=="refresh"){if(DEMO)S.upd=Date.now();else{loadMetro();loadWeather()}toast("Refreshing…")}
+ else if(a=="refresh"){if(DEMO)S.upd=Date.now();else{loadMetro();loadWeather();loadSP();sync()}toast("Refreshing…")}
  else if(a=="export"){const b=new Blob([JSON.stringify({checkins:D,lessons:L},null,1)],{type:"application/json"}),u=document.createElement("a");u.href=URL.createObjectURL(b);u.download="hoje-"+TODAY+".json";u.click()}
  else if(a=="ftag")S.ftag=v;
  else if(a=="ltag"){const i=Lf.tags.indexOf(v);i<0?Lf.tags.push(v):Lf.tags.splice(i,1)}
  else if(a=="ledit"){const x=L.find(y=>y.d===v);Lf={d:x.d,text:x.text,tags:[...x.tags]};scrollTo(0,0)}
  else if(a=="lsave"){if(!Lf.text.trim()){toast("Write the lesson first");return}
-  const x={d:Lf.d,text:Lf.text.trim(),tags:Lf.tags.length?Lf.tags:["Other"]},i=L.findIndex(y=>y.d===x.d);if(i>=0)L[i]=x;else L.push(x);toast("Lesson saved");Lf={d:TODAY,text:"",tags:[]}}
+  const x={d:Lf.d,text:Lf.text.trim(),tags:Lf.tags.length?Lf.tags:["Other"],u:Date.now()},i=L.findIndex(y=>y.d===x.d);if(i>=0)L[i]=x;else L.push(x);push("lesson",x);toast("Lesson saved");Lf={d:TODAY,text:"",tags:[]}}
  persist();draw()}
 document.addEventListener("click",e=>{const b=e.target.closest("[data-a]");if(b)act(b.dataset.a,b.dataset.v)});
 document.addEventListener("input",e=>{const t=e.target,d=t.dataset;
@@ -229,5 +231,13 @@ draw();
 async function loadMetro(){const dk=S.dir||(new Date().getHours()<14?"ss":"ae");try{const r=await fetch("/api/metro?dir="+dk),j=await r.json();MT=j.error?{dir:dk,secs:[],err:1}:{...j,at:Date.now()}}catch(e){MT={dir:dk,secs:[],err:1}}S.upd=Date.now();if(S.tab=="today")draw()}
 async function loadWeather(){try{const r=await fetch("https://api.open-meteo.com/v1/forecast?latitude=38.72&longitude=-9.14&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m&hourly=temperature_2m,precipitation_probability,uv_index&timezone=Europe%2FLisbon&forecast_days=1"),j=await r.json(),c=j.current,H=j.hourly,h=new Date().getHours();
  W={t:Math.round(c.temperature_2m),fl:Math.round(c.apparent_temperature),hum:c.relative_humidity_2m,wind:Math.round(c.wind_speed_10m),uv:Math.round((H.uv_index||[])[h]||0),lab:wl(c.weather_code),hrs:H.temperature_2m.map((t,i)=>({t:Math.round(t),p:H.precipitation_probability[i]||0}))}}catch(e){}if(S.tab=="today")draw()}
-if(!DEMO){loadMetro();loadWeather();setInterval(()=>{if(S.tab=="today"&&!document.hidden)loadMetro()},30000);document.addEventListener("visibilitychange",()=>{if(!document.hidden){loadMetro();loadWeather()}});try{navigator.serviceWorker.register("/sw.js")}catch(e){}}
+async function loadSP(){try{const r=await fetch("/api/sp500"),j=await r.json();if(j.p)SP={p:j.p,pct:j.pct??null,t:j.t||null}}catch(e){}if(S.tab=="today")draw()}
+const pin=()=>{try{let p=localStorage.getItem("hoje.pin");if(!p){p=prompt("Enter your Hoje PIN to sync your data");if(p)localStorage.setItem("hoje.pin",p)}return p}catch(e){return null}};
+async function api(body){const p=pin();if(!p)throw 0;const r=await fetch("/api/data",{method:body?"POST":"GET",headers:{"x-pin":p,"Content-Type":"application/json"},body:body?JSON.stringify(body):undefined});if(r.status==401){localStorage.removeItem("hoje.pin");throw 0}if(!r.ok)throw 0;return r.json()}
+const push=(type,r)=>{if(!DEMO)api({type,records:[r]}).then(()=>{SYNC="ok";if(S.tab=="today")draw()}).catch(()=>{SYNC="err"})};
+async function sync(){if(DEMO)return;try{const R=await api(),mg=(loc,rem)=>{const m=new Map(rem.map(x=>[x.d,x])),up=[];loc.forEach(x=>{const y=m.get(x.d);if(!y||(x.u||0)>(y.u||0)){m.set(x.d,x);up.push(x)}});return[[...m.values()].sort((a,b)=>a.d.localeCompare(b.d)),up]};
+ const[c,uc]=mg(D,R.checkins),[l,ul]=mg(L,R.lessons);D.splice(0,D.length,...c);L.splice(0,L.length,...l);persist();
+ if(uc.length)await api({type:"checkin",records:uc});if(ul.length)await api({type:"lesson",records:ul});SYNC="ok"}catch(e){SYNC="err"}
+ if(!F.mood&&!F.energy)loadF();draw()}
+if(!DEMO){loadMetro();loadWeather();loadSP();sync();setInterval(()=>{if(S.tab=="today"&&!document.hidden)loadSP()},300000);setInterval(()=>{if(S.tab=="today"&&!document.hidden)loadMetro()},30000);document.addEventListener("visibilitychange",()=>{if(!document.hidden){loadMetro();loadWeather();loadSP();sync()}});try{navigator.serviceWorker.register("/sw.js")}catch(e){}}
 </script></body></html>
